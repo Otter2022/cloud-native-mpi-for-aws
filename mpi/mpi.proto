@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package mpi;
+
+option go_package = "../mpi;mpi";
+
+service MPIServer {
+  rpc Send (Message) returns (Empty);
+  rpc Recv (RecvRequest) returns (Message);
+}
+
+message Message {
+  int32 source = 1;
+  int32 dest = 2;
+  int32 tag = 3;
+  bytes data = 4;
+}
+
+message RecvRequest {
+  int32 source = 1; // -1 for any source
+  int32 tag = 2;    // -1 for any tag
+}
+
+message Empty {}
