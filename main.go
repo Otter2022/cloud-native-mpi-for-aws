@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/Otter2022/cloud-native-mpi-for-aws/mpi"
+	mpi "github.com/Otter2022/cloud-native-mpi-for-aws/mpi"
 )
 
 func main() {
