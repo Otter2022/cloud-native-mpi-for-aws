@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+	"strconv"
 
 	mpi "github.com/Otter2022/cloud-native-mpi-for-aws/mpi"
 )
@@ -14,7 +16,10 @@ func main() {
 	rank := mpi.MPI_Comm_rank()
 	size := mpi.MPI_Comm_size()
 	const ROOT = 0
-	N := 1000
+	N, err := strconv.Atoi(os.Args[1])
+	if err != nil {
+		log.Fatalf("%v", err)
+	}
 	chunkSize := N / size
 
 	var chunk []int
