@@ -5,12 +5,14 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 
 	mpi "github.com/Otter2022/cloud-native-mpi-for-aws/mpi"
 )
 
 func main() {
 	mpi.MPI_Init()
+	start := time.Now()
 	defer mpi.MPI_Finalize()
 
 	rank := mpi.MPI_Comm_rank()
@@ -75,6 +77,7 @@ func main() {
 			mpi.Deserialize(dataBytes, &receivedSum)
 			totalSum += receivedSum
 		}
-		fmt.Printf("Total Sum = %d\n", totalSum)
+		elapsed := time.Since(start)
+		fmt.Printf("%d,%d,%d\n", N, totalSum, elapsed)
 	}
 }
