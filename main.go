@@ -12,7 +12,6 @@ import (
 
 func main() {
 	mpi.MPI_Init()
-	start := time.Now()
 	defer mpi.MPI_Finalize()
 
 	rank := mpi.MPI_Comm_rank()
@@ -25,6 +24,7 @@ func main() {
 	chunkSize := N / size
 
 	var chunk []int
+	commStart := time.Now()
 	if rank == ROOT {
 		// Initialize the array
 		array := make([]int, N)
@@ -53,13 +53,17 @@ func main() {
 		mpi.Deserialize(dataBytes, &data)
 		chunk = data
 	}
+	commElapsed := time.Since(commStart)
 
+	computeStart := time.Now()
 	// Compute partial sum
 	partialSum := 0
 	for _, val := range chunk {
 		partialSum += val
 	}
+	computeElapsed := time.Since(computeStart)
 
+	commStart2 := time.Now()
 	if rank != ROOT {
 		// Send partial sum to ROOT
 		err := mpi.MPI_Send(mpi.Serialize(partialSum), ROOT, 1)
@@ -77,7 +81,8 @@ func main() {
 			mpi.Deserialize(dataBytes, &receivedSum)
 			totalSum += receivedSum
 		}
-		elapsed := time.Since(start)
-		fmt.Printf("%d,%d,%d\n", N, totalSum, elapsed)
+		commElapsed2 := time.Since(commStart2)
+		totalElapsed := commElapsed + computeElapsed + commElapsed2
+		fmt.Printf("%d,%d,%d,%d,%d\n", N, totalSum, commElapsed.Nanoseconds(), computeElapsed.Nanoseconds(), totalElapsed.Nanoseconds())
 	}
 }
