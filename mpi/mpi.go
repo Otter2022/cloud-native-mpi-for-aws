@@ -48,7 +48,6 @@ func MPI_Init() {
 	go startServer()
 }
 
-// MPI_Finalize cleans up the MPI environment
 func MPI_Finalize() {
 	if mpiServer != nil {
 		mpiServer.GracefulStop()
@@ -60,7 +59,13 @@ func startServer() {
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
-	mpiServer = grpc.NewServer()
+	// Increase the maximum message size
+	var maxMsgSize = 1024 * 1024 * 50 // 50 MiB, adjust as needed
+
+	mpiServer = grpc.NewServer(
+		grpc.MaxRecvMsgSize(maxMsgSize),
+		grpc.MaxSendMsgSize(maxMsgSize),
+	)
 	RegisterMPIServerServer(mpiServer, mpiServerInstance)
 	if err := mpiServer.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v", err)

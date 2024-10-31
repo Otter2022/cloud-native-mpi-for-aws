@@ -85,7 +85,16 @@ func getClient(dest int) (MPIServerClient, error) {
 	if client, ok := clients[dest]; ok {
 		return client, nil
 	}
-	conn, err := grpc.Dial(addresses[dest], grpc.WithInsecure())
+	var maxMsgSize = 1024 * 1024 * 50 // 50 MiB
+
+	conn, err := grpc.Dial(
+		addresses[dest],
+		grpc.WithInsecure(),
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallSendMsgSize(maxMsgSize),
+			grpc.MaxCallRecvMsgSize(maxMsgSize),
+		),
+	)
 	if err != nil {
 		return nil, err
 	}
