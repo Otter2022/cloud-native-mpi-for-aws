@@ -6,6 +6,11 @@ import (
 	"log"
 )
 
+func init() {
+	gob.Register([]int{})
+	gob.Register(int(0))
+}
+
 // Serialize serializes data into bytes
 func Serialize(data interface{}) []byte {
 	var buf bytes.Buffer
