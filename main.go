@@ -1,9 +1,9 @@
-// main.go
 package main
 
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"strconv"
 
@@ -18,46 +18,90 @@ func main() {
 	size := mpi.MPI_Comm_size()
 	const ROOT = 0
 
+	// Read matrix size from command-line argument
 	N, err := strconv.Atoi(os.Args[1])
 	if err != nil {
-		log.Fatalf("%v", err)
+		log.Fatalf("Error parsing matrix size: %v", err)
+	}
+
+	// Ensure the size can be evenly divided among processes
+	if N%size != 0 {
+		log.Fatalf("Matrix size %d must be divisible by the number of processes %d", N, size)
 	}
 	chunkSize := N / size
 
-	var array []int
+	var A, B, C [][]int // Matrices A, B, and result C
+
 	if rank == ROOT {
-		// Initialize the array
-		array = make([]int, N)
-		for i := 0; i < N; i++ {
-			array[i] = i + 1
+		// Initialize matrices A and B with random values
+		A = generateMatrix(N, N)
+		B = generateMatrix(N, N)
+		C = make([][]int, N)
+		for i := range C {
+			C[i] = make([]int, N)
 		}
 	}
 
-	// Broadcast the array to all processes
-	err = mpi.MPI_Bcast(&array, ROOT)
+	// Broadcast matrices A and B to all processes
+	err = mpi.MPI_Bcast(&A, ROOT)
 	if err != nil {
-		log.Fatalf("Rank %d: Error in MPI_Bcast: %v", rank, err)
+		log.Fatalf("Rank %d: Error in MPI_Bcast for A: %v", rank, err)
 	}
-
-	// Each process computes its chunk
-	start := rank * chunkSize
-	end := start + chunkSize
-	chunk := array[start:end]
-
-	// Compute partial sum
-	partialSum := 0
-	for _, val := range chunk {
-		partialSum += val
-	}
-
-	// Reduce partial sums to total sum
-	var totalSum int
-	err = mpi.MPI_Reduce(partialSum, &totalSum, mpi.Sum, ROOT)
+	err = mpi.MPI_Bcast(&B, ROOT)
 	if err != nil {
-		log.Fatalf("Rank %d: Error in MPI_Reduce: %v", rank, err)
+		log.Fatalf("Rank %d: Error in MPI_Bcast for B: %v", rank, err)
 	}
 
+	// Allocate a chunk of the result matrix for this process
+	localC := make([][]int, chunkSize)
+	for i := range localC {
+		localC[i] = make([]int, N)
+	}
+
+	// Compute the assigned rows of the result matrix
+	startRow := rank * chunkSize
+	for i := 0; i < chunkSize; i++ {
+		for j := 0; j < N; j++ {
+			localC[i][j] = 0
+			for k := 0; k < N; k++ {
+				localC[i][j] += A[startRow+i][k] * B[k][j]
+			}
+		}
+	}
+
+	// Reduce local result matrices to the final result matrix at ROOT
+	for i := 0; i < chunkSize; i++ {
+		err = mpi.MPI_Reduce(localC[i], &C[startRow+i], mpi.Sum, ROOT)
+		if err != nil {
+			log.Fatalf("Rank %d: Error in MPI_Reduce for row %d: %v", rank, startRow+i, err)
+		}
+	}
+
+	// Print the result matrix at ROOT
 	if rank == ROOT {
-		fmt.Printf("Total sum is %d\n", totalSum)
+		fmt.Println("Resultant Matrix C:")
+		printMatrix(C)
+	}
+}
+
+// generateMatrix creates a matrix with random integers
+func generateMatrix(rows, cols int) [][]int {
+	matrix := make([][]int, rows)
+	for i := range matrix {
+		matrix[i] = make([]int, cols)
+		for j := range matrix[i] {
+			matrix[i][j] = rand.Intn(10) // Random values between 0 and 9
+		}
+	}
+	return matrix
+}
+
+// printMatrix prints a 2D matrix
+func printMatrix(matrix [][]int) {
+	for _, row := range matrix {
+		for _, val := range row {
+			fmt.Printf("%4d", val)
+		}
+		fmt.Println()
 	}
 }
