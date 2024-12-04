@@ -30,78 +30,65 @@ func main() {
 	}
 	chunkSize := N / size
 
-	var A, B, C [][]int // Matrices A, B, and result C
+	// Matrices to be shared across processes
+	var A, B, C []float64
+	var localA, localB []float64
 
 	if rank == ROOT {
 		// Initialize matrices A and B with random values
-		A = generateMatrix(N, N)
-		B = generateMatrix(N, N)
-		C = make([][]int, N)
-		for i := range C {
-			C[i] = make([]int, N)
+		A = make([]float64, N*N)
+		B = make([]float64, N*N)
+		C = make([]float64, N*N)
+
+		for i := range A {
+			A[i] = float64(rand.Intn(10))
+		}
+		for i := range B {
+			B[i] = float64(rand.Intn(10))
 		}
 	}
 
-	// Broadcast matrices A and B to all processes
-	err = mpi.MPI_Bcast(&A, ROOT)
+	// Prepare local matrices for each process
+	localA = make([]float64, chunkSize*N)
+	localB = make([]float64, N*N)
+	localC := make([]float64, chunkSize*N)
+
+	// Scatter matrix A rows and broadcast matrix B fully
+	err = mpi.MPI_Scatter(A, localA, N*chunkSize, ROOT)
 	if err != nil {
-		log.Fatalf("Rank %d: Error in MPI_Bcast for A: %v", rank, err)
+		log.Fatalf("Rank %d: Error in MPI_Scatter for A: %v", rank, err)
 	}
-	err = mpi.MPI_Bcast(&B, ROOT)
+
+	err = mpi.MPI_Bcast(B, N*N, ROOT)
 	if err != nil {
 		log.Fatalf("Rank %d: Error in MPI_Bcast for B: %v", rank, err)
 	}
 
-	// Allocate a chunk of the result matrix for this process
-	localC := make([][]int, chunkSize)
-	for i := range localC {
-		localC[i] = make([]int, N)
-	}
-
-	// Compute the assigned rows of the result matrix
-	startRow := rank * chunkSize
+	// Matrix multiplication for local chunk
 	for i := 0; i < chunkSize; i++ {
 		for j := 0; j < N; j++ {
-			localC[i][j] = 0
+			sum := 0.0
 			for k := 0; k < N; k++ {
-				localC[i][j] += A[startRow+i][k] * B[k][j]
+				sum += localA[i*N+k] * localB[k*N+j]
 			}
+			localC[i*N+j] = sum
 		}
 	}
 
-	// Reduce local result matrices to the final result matrix at ROOT
-	for i := 0; i < chunkSize; i++ {
-		err = mpi.MPI_Reduce(localC[i], &C[startRow+i], mpi.Sum, ROOT)
-		if err != nil {
-			log.Fatalf("Rank %d: Error in MPI_Reduce for row %d: %v", rank, startRow+i, err)
-		}
+	// Gather results back to the root process
+	err = mpi.MPI_Gather(localC, C, N*chunkSize, ROOT)
+	if err != nil {
+		log.Fatalf("Rank %d: Error in MPI_Gather: %v", rank, err)
 	}
 
 	// Print the result matrix at ROOT
 	if rank == ROOT {
 		fmt.Println("Resultant Matrix C:")
-		printMatrix(C)
-	}
-}
-
-// generateMatrix creates a matrix with random integers
-func generateMatrix(rows, cols int) [][]int {
-	matrix := make([][]int, rows)
-	for i := range matrix {
-		matrix[i] = make([]int, cols)
-		for j := range matrix[i] {
-			matrix[i][j] = rand.Intn(10) // Random values between 0 and 9
+		for i := 0; i < N; i++ {
+			for j := 0; j < N; j++ {
+				fmt.Printf("%6.1f", C[i*N+j])
+			}
+			fmt.Println()
 		}
-	}
-	return matrix
-}
-
-// printMatrix prints a 2D matrix
-func printMatrix(matrix [][]int) {
-	for _, row := range matrix {
-		for _, val := range row {
-			fmt.Printf("%4d", val)
-		}
-		fmt.Println()
 	}
 }
