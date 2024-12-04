@@ -59,6 +59,8 @@ func main() {
 		log.Fatalf("Rank %d: Error in MPI_Scatter for A: %v", rank, err)
 	}
 
+	print(localA)
+
 	err = mpi.MPI_Bcast(B, N*N, ROOT)
 	if err != nil {
 		log.Fatalf("Rank %d: Error in MPI_Bcast for B: %v", rank, err)
