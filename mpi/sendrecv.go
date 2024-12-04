@@ -10,7 +10,6 @@ import (
 const (
 	TagBroadcast = 0
 	TagReduce    = 1
-	// ... other tags ...
 )
 
 type server struct {
@@ -38,13 +37,17 @@ func (s *server) Recv(ctx context.Context, req *RecvRequest) (*Message, error) {
 		case <-ticker.C:
 			s.mu.Lock()
 			for tag, msgs := range s.messages {
+				// Check if request allows this tag
 				if req.Tag != -1 && req.Tag != tag {
 					continue
 				}
+
 				for i, msg := range msgs {
+					// Check if request allows this source
 					if req.Source != -1 && req.Source != msg.Source {
 						continue
 					}
+
 					// Found matching message
 					s.messages[tag] = append(msgs[:i], msgs[i+1:]...)
 					s.mu.Unlock()
